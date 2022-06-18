@@ -7,10 +7,12 @@
 
 #define MAX_WEIGHT 25
 
-//SRF05 srf05(ARDUINO_UNO_D3, ARDUINO_UNO_D2); 
-SRF05 srf05(D6, D5); 
 UnbufferedSerial pc(CONSOLE_TX, CONSOLE_RX, 115200) ; 
+UnbufferedSerial door(D8, D2, 115200) ; 
+UnbufferedSerial motor(PA_11, PA_12, 115200) ;
 
+
+// OLED
 class SPIPreInit : public SPI
 {
 public:
@@ -20,28 +22,30 @@ public:
         frequency(2000000);  
     };   
 }; 
-
 SPIPreInit gSPI(D11, NC, D13) ; 
 Adafruit_SSD1306_Spi gOLED(gSPI, D4, D7, D10, 64) ; 
-
-UnbufferedSerial door(D8, D2, 115200) ; 
-UnbufferedSerial motor(PA_11, PA_12, 115200) ;
 
 
 // Open Button 
 DigitalIn open_button(PB_13) ; 
 
+
 // Bell Button & Buzzer 
+PwmOut buzzer(D9) ; 
+Timer _timer ; 
 int period_us;
 int beat_ms;
 InterruptIn emergency_button(PB_14) ; 
-PwmOut buzzer(D9) ; 
-Timer _timer ; 
 
+
+// Ultrasonic
+SRF05 srf05(D6, D5); 
 int motor_direction ; 
-DigitalOut redLight(D3);
+
+
 // WeightSensor
 HX711 scale(D14,D15);
+DigitalOut redLight(D3);
 float calibration_factor = 1000; //-7050 worked for my 440lb max scale setup
 int averageSamples = 100;
 
@@ -122,9 +126,8 @@ void bell_interrupt_route() {
         period_us = 1000000 / 523.251;
         beat_ms = 62.5 * 4;
         buzzer.period_us(period_us);
-//        for (int i = 0 ; i < 1000; i++) ;
+
         while(std::chrono::duration<float>(_timer.elapsed_time()).count() < 1 ) {}
-        //ThisThread::sleep_for(chrono::milliseconds(beat_ms));
         
         _timer.stop();
         
@@ -133,17 +136,19 @@ void bell_interrupt_route() {
         
         _timer.reset();
         _timer.start() ; 
+        
         while(std::chrono::duration<float>(_timer.elapsed_time()).count() < 1 ) {}
+        
         _timer.stop();
-//        ThisThread::sleep_for(chrono::milliseconds(beat_ms));
         
         buzzer = 1.0;
         
         _timer.reset();
         _timer.start() ; 
+        
         while(std::chrono::duration<float>(_timer.elapsed_time()).count() < 1 ) {}
+        
         _timer.stop();
-//        ThisThread::sleep_for(chrono::milliseconds(100));
         
         sprintf(motor_buf, "%d\r", curr_motor_direction) ; 
         motor.write(motor_buf,strlen(motor_buf)) ; 
@@ -168,12 +173,12 @@ int main()
     sprintf(buffer, "\r\nEmbeded Fianl Project.\r\n\r\n") ;
     pc.write(buffer, strlen(buffer)) ;
     
-    // weight sensor initialization
+    // Weight sensor initialization
     scale.setScale(0);
     scale.tare(); //Reset the scale to 0  
     
-    // 처음에 1층으로 세팅
-    // Close door
+    // Init
+    // Close all door
     door.write("0", 1) ;
     
     redLight = 1 ;
@@ -218,26 +223,22 @@ int main()
         char c ; 
         
         scale.setScale(calibration_factor); //Adjust to this calibration factor
-        float weight = -1 ;  // = -1 * scale.getGram();
+        float weight = -1 ;
         
         ThisThread::sleep_for(20ms) ; 
-        
-//        sprintf(buffer, "Weight: %.2f\r\n", weight) ; 
-//        pc.write(buffer, strlen(buffer)) ; 
         
         sprintf(buffer, "curr distance: %.2f\r\n", distance); 
         pc.write(buffer, strlen(buffer)) ; 
         
         if ( distance < 26 ) {
             
-            if ( open_door && next_floor == '1' && distance >= 2.4 && distance <= 3.2) { // 딱 1층일 때 open
+            if ( open_door && next_floor == '1' && distance >= 2.4 && distance <= 3.2) {
                 curr_floor = '1' ; 
                 
                 gOLED.printf("%cF", curr_floor); 
                 gOLED.display() ;
                 
                 motor_direction = 1;  
-                // motor stop 
                 sprintf(motor_buf, "%d\r", 1) ;
                 motor.write(motor_buf, strlen(motor_buf)) ;
                 
@@ -279,9 +280,7 @@ int main()
                 
                 gOLED.printf("%cF", curr_floor); 
                 gOLED.display() ;
-                // motor stop 
-//                c = '1' ; 
-//                motor.write(&c, 1) ;
+ 
                 motor_direction = 1;  
                 sprintf(motor_buf, "%d\r", 1) ;
                 motor.write(motor_buf, strlen(motor_buf)) ;
@@ -313,22 +312,18 @@ int main()
                 
                 redLight = 0;
                 
-                
                 // Second floor door close
                 door.write("5", 1) ;
                 
                 open_door = false ;
             }
         } else {
-            
             if ( open_door && next_floor == '3' && distance >= 47 && distance <= 47.8 ) { // 딱 3층일 때 open
                 
                 curr_floor = '3'; 
                 gOLED.printf("%cF", curr_floor); 
                 gOLED.display() ;
-                // motor stop 
-//                c = '1' ; 
-//                motor.write(&c, 1) ;
+  
                 motor_direction = 1;  
                 sprintf(motor_buf, "%d\r", 1) ;
                 motor.write(motor_buf, strlen(motor_buf)) ;
