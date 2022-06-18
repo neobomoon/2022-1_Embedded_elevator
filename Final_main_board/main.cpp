@@ -1,8 +1,8 @@
 // main
 #include "mbed.h"
-#include "SRF05.h"              // 
-#include "Adafruit_SSD1306.h"   // OLED
-#include "HX711.h" // Weight Sensor
+#include "SRF05.h"             
+#include "Adafruit_SSD1306.h" 
+#include "HX711.h" 
 #define SCALE_VALUE 473000
 
 #define MAX_WEIGHT 25
@@ -24,7 +24,7 @@ public:
 SPIPreInit gSPI(D11, NC, D13) ; 
 Adafruit_SSD1306_Spi gOLED(gSPI, D4, D7, D10, 64) ; 
 
-UnbufferedSerial door(D8, D2, 115200) ; // TX, RX  
+UnbufferedSerial door(D8, D2, 115200) ; 
 UnbufferedSerial motor(PA_11, PA_12, 115200) ;
 
 
