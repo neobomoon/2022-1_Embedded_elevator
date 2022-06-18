@@ -6,7 +6,7 @@ char buf[MAXIMUM_BUFFER_SIZE];
 UnbufferedSerial pc(CONSOLE_TX, CONSOLE_RX, 115200);
 static UnbufferedSerial main_pc(PA_11,PA_12,115200);
 
-BusOut motor_out(D8,D9,D10,D11);  // blue - pink - yellow - orange
+BusOut motor_out(D8,D9,D10,D11);
 
 int step = 0; 
 int dir = 2; // direction
@@ -39,11 +39,8 @@ void rx_cb(void)
 int main()
 {   
     main_pc.attach(rx_cb);
-    while(1)
-    {   
-        //2 up
-        //1 stop
-        //0 down 
+    while(1) // 0: down, 1: stop, 2: up
+    { 
         
         if(flag){
             
@@ -74,13 +71,12 @@ int main()
                 case 5: motor_out = 0xC; break;  // 1100
                 case 6: motor_out = 0x8; break;  // 1000
                 case 7: motor_out = 0x9; break;  // 1001
-                
                 default: motor_out = 0x0; break; // 0000
             }
       
             if(dir) step++; else step--; 
-            if(step>7)step=0; 
-            if(step<0)step=7; 
+            if(step>7) step=0; 
+            if(step<0) step=7; 
             wait_us(1500);  // speed
         }
     }
