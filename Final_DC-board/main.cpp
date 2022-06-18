@@ -1,75 +1,87 @@
 #include "mbed.h"
 
-#define MAXIMUM_BUFFER_SIZE 80 
-char buf[MAXIMUM_BUFFER_SIZE] ; 
+#define MAXIMUM_BUFFER_SIZE 80
+char buf[MAXIMUM_BUFFER_SIZE];
 
-static UnbufferedSerial pc(CONSOLE_TX, CONSOLE_RX, 115200) ;
-BusOut motor_out(D8, D9, D10, D11) ;
+UnbufferedSerial pc(CONSOLE_TX, CONSOLE_RX, 115200);
+static UnbufferedSerial main_pc(PA_11,PA_12,115200);
 
-// receive data from phone
-int i = 0 ;
-char motor_buf[80] ;
-char buffer[80] ;
-int step = 0 ;
-int dir ;
-int flag ;
-int index ;
-void rx_handler() {
-    char c ;
-    if ( pc.read(&c, 1) ) {
-        pc.write(&c, 1) ;
-        if ( c == '\r' ){
-            motor_buf[index] = '\0' ;
-            index = 0 ;
-            
-            if ( strcmp(motor_buf, "1") || motor_buf[0] == '2' || motor_buf[0] =='3') {
-                dir = atoi(motor_buf) ;  
-                flag = 1 ;
-                pc.write("Success dir is %d\n", dir) ;    
-            }
-            else {
-                sprintf(buffer, "Input 1 or 2 or 3. Your input is \"%s\"\r\n", motor_buf) ;
-                pc.write(buffer, strlen(buffer)) ;
-            }
-        }
-        else if ( c == 8 ) {
-            index-- ;
-            pc.write(" ", 1) ;
-            pc.write(&c, 1) ;
-            motor_buf[index] = ' ' ;
-        }
-        else {
-            motor_buf[index++] = c ;
-        }
+BusOut motor_out(D8,D9,D10,D11);  // blue - pink - yellow - orange
+
+int step = 0; 
+int dir = 2; // direction
+char rxBuf_pc[80];
+int index = 0;
+int flag = 0;
+
+void rx_cb(void)
+{
+    char ch;
+    main_pc.read(&ch,1);
+    pc.write(&ch,1);
+    
+    if(ch == '\r'){
+        ch = '\n';
+        pc.write(&ch, 1);
+        rxBuf_pc[index] = '\0';
+        index = 0;  
+        flag = 1;
+    }else if(ch == 8){
+        index--;
+        pc.write(" ",1);
+        pc.write(&ch,1);
+        rxBuf_pc[index] = ' ';   
+    }else{
+        rxBuf_pc[index++] = ch;
     }
 }
 
-int main (void) {
-    dir = 0 ;
-    flag = 0 ;
-    index = 0 ;
-    pc.attach(rx_handler, SerialBase::RxIrq) ;
-    sprintf(buf, "Test for motor\r\n") ;
-    pc.write(buf, strlen(buf)) ;
-    
-    while (1) {
-        if ( dir == 1 || dir == 3 ) {
-            switch(step) {
-                case 0: motor_out = 0x1; break ;
-                case 1: motor_out = 0x3; break ;
-                case 2: motor_out = 0x2; break ;
-                case 3: motor_out = 0x6; break ;
-                case 4: motor_out = 0x4; break ;
-                case 5: motor_out = 0xc; break ;
-                case 6: motor_out = 0x8; break ;
-                case 7: motor_out = 0x9; break ;
-                default: motor_out = 0x0; break ;
-            }
+int main()
+{   
+    main_pc.attach(rx_cb);
+    while(1)
+    {   
+        //2 up
+        //1 stop
+        //0 down 
+        
+        if(flag){
             
-            if (dir == 1) step++; else step-- ;
-            if (step > 7) step = 0 ;
-            if (step < 0) step = 7 ;
-            wait_us(1500) ;
+            if(!strcmp(rxBuf_pc,"0"))
+            {
+                dir = 0;
+            }
+            else if(!strcmp(rxBuf_pc,"1"))
+            {
+                dir = 2;
+            }
+            else if(!strcmp(rxBuf_pc,"2"))
+            {
+                dir = 1;
+            }
+            memset(rxBuf_pc,0,sizeof(rxBuf_pc));
+            flag = 0;
+        }
+
+        if(dir <= 1){
+            switch(step)
+            { 
+                case 0: motor_out = 0x1; break;  // 0001
+                case 1: motor_out = 0x3; break;  // 0011
+                case 2: motor_out = 0x2; break;  // 0010   
+                case 3: motor_out = 0x6; break;  // 0110
+                case 4: motor_out = 0x4; break;  // 0100
+                case 5: motor_out = 0xC; break;  // 1100
+                case 6: motor_out = 0x8; break;  // 1000
+                case 7: motor_out = 0x9; break;  // 1001
+                
+                default: motor_out = 0x0; break; // 0000
+            }
+      
+            if(dir) step++; else step--; 
+            if(step>7)step=0; 
+            if(step<0)step=7; 
+            wait_us(1500);  // speed
         }
     }
 }
